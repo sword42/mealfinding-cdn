@@ -184,8 +184,8 @@ Then run `terraform apply` to update.
 
 ### Domains
 
-- `mealfinding.com` (apex) → `mealfinding-web.fly.dev`
-- `www.mealfinding.com` → `mealfinding-web.fly.dev`
+- `mealfinding.com` (apex) → `mealfinding.fly.dev`
+- `www.mealfinding.com` → `mealfinding.fly.dev`
 - `api.mealfinding.com` → `mealfinding-api.fly.dev`
 
 ### Routing Logic

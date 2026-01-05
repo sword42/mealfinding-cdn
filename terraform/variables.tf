@@ -19,7 +19,7 @@ variable "web_origin" {
     port    = number
   })
   default = {
-    address = "mealfinding-web.fly.dev"
+    address = "mealfinding.fly.dev"
     port    = 443
   }
 }

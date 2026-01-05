@@ -39,7 +39,7 @@ The system SHALL configure origin backends with SSL, health checks, and shieldin
 #### Scenario: Web origin backend
 
 - **WHEN** requests target `mealfinding.com` or `www.mealfinding.com`
-- **THEN** traffic is routed to `mealfinding-web.fly.dev` via HTTPS on port 443
+- **THEN** traffic is routed to `mealfinding.fly.dev` via HTTPS on port 443
 - **AND** origin shielding is enabled at POP `iad-va-us`
 
 #### Scenario: API origin backend
