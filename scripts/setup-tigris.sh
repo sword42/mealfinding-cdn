@@ -5,6 +5,18 @@ set -euo pipefail
 
 BUCKET_NAME="mealfinding-terraform-state"
 
+# Use flyctl from common locations
+if command -v flyctl &> /dev/null; then
+    FLY_CMD="flyctl"
+elif [ -f "$HOME/.fly/bin/flyctl" ]; then
+    FLY_CMD="$HOME/.fly/bin/flyctl"
+elif command -v fly &> /dev/null; then
+    FLY_CMD="fly"
+else
+    echo "Error: flyctl not found. Please install: https://fly.io/docs/hands-on/install-flyctl/"
+    exit 1
+fi
+
 echo "========================================="
 echo "Tigris Bucket Setup for Terraform State"
 echo "========================================="
@@ -14,7 +26,7 @@ echo ""
 
 # Create the bucket using Fly CLI
 # This requires you to be logged into Fly (flyctl auth login)
-fly storage create "$BUCKET_NAME"
+$FLY_CMD storage create --org personal --name "$BUCKET_NAME"
 
 echo ""
 echo "========================================="
