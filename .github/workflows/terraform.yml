@@ -167,7 +167,7 @@ jobs:
         uses: trstringer/manual-approval@v1
         with:
           secret: ${{ github.token }}
-          approvers: sword
+          approvers: sword42
           minimum-approvals: 1
           issue-title: "Terraform Apply Approval Required"
           issue-body: |
