@@ -1,0 +1,207 @@
+name: Terraform
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'terraform/**'
+      - '.github/workflows/terraform.yml'
+
+# Prevent concurrent runs on the same branch
+# For PRs: cancel in-progress runs when new commits are pushed
+# For main: queue runs to prevent state corruption
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  terraform-validate:
+    name: Validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Terraform Format Check
+        id: fmt
+        run: terraform fmt -check -recursive
+        continue-on-error: true
+
+      - name: Terraform Init (without backend)
+        id: init
+        run: terraform init -backend=false
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Add validation summary
+        if: always()
+        run: |
+          echo "## Terraform Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Format | ${{ steps.fmt.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Init | ${{ steps.init.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Validate | ${{ steps.validate.outcome == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+      - name: Fail if format check failed
+        if: steps.fmt.outcome == 'failure'
+        run: |
+          echo "❌ Terraform files are not properly formatted. Run 'terraform fmt -recursive' locally."
+          exit 1
+
+  terraform-plan:
+    name: Plan
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Terraform Plan
+        id: plan
+        run: |
+          terraform plan -no-color -out=tfplan
+          terraform show -no-color tfplan > tfplan.txt
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          FASTLY_API_KEY: ${{ secrets.FASTLY_API_KEY }}
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: |
+            terraform/tfplan
+            terraform/tfplan.txt
+          retention-days: 1
+
+      - name: Comment plan on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('terraform/tfplan.txt', 'utf8');
+            const output = `## Terraform Plan Results
+
+            <details>
+            <summary>Show Plan</summary>
+
+            \`\`\`terraform
+            ${plan}
+            \`\`\`
+
+            </details>
+
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            `;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+  terraform-apply:
+    name: Apply
+    runs-on: ubuntu-latest
+    needs: terraform-plan
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    defaults:
+      run:
+        working-directory: terraform
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+
+      - name: Manual Approval
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ github.token }}
+          approvers: sword
+          minimum-approvals: 1
+          issue-title: "Terraform Apply Approval Required"
+          issue-body: |
+            ## Terraform Apply Approval
+
+            A Terraform plan is ready to be applied to production infrastructure.
+
+            **Branch:** ${{ github.ref_name }}
+            **Commit:** ${{ github.sha }}
+            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            Please review the plan in the workflow artifacts and comment:
+            - `approved` to proceed with apply
+            - `denied` to cancel the apply
+
+            **⚠️ Warning:** This will modify production infrastructure!
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: terraform
+
+      - name: Terraform Init
+        run: terraform init
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+      - name: Terraform Apply
+        run: terraform apply tfplan
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          FASTLY_API_KEY: ${{ secrets.FASTLY_API_KEY }}
+
+      - name: Add apply summary
+        if: always()
+        run: |
+          echo "## Terraform Apply Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status == 'success' && '✅ Applied' || '❌ Failed' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
