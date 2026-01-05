@@ -4,25 +4,6 @@ resource "fastly_service_vcl" "mealfinding" {
   name = var.service_name
 
   # ============================================
-  # DOMAINS
-  # ============================================
-
-  domain {
-    name    = var.domain_name
-    comment = "Apex domain"
-  }
-
-  domain {
-    name    = "www.${var.domain_name}"
-    comment = "Primary www subdomain for web frontend"
-  }
-
-  domain {
-    name    = "api.${var.domain_name}"
-    comment = "API subdomain"
-  }
-
-  # ============================================
   # BACKENDS (Origin Servers)
   # ============================================
 
