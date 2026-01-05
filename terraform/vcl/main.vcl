@@ -72,7 +72,7 @@ sub vcl_hash {
   #FASTLY hash
 
   # Include host in cache key to separate www vs api content
-  set req.hash += req.http.host;
+  hash_data(req.http.host);
 }
 
 sub vcl_fetch {
@@ -104,8 +104,7 @@ sub vcl_fetch {
     # If origin doesn't set cache headers, don't cache
     if (!beresp.http.Cache-Control) {
       set beresp.ttl = 0s;
-      set beresp.uncacheable = true;
-      return(deliver);
+      return(pass);
     }
   }
 
@@ -114,8 +113,7 @@ sub vcl_fetch {
   # ----------------------------------------
   if (beresp.status >= 500 && beresp.status < 600) {
     set beresp.ttl = 0s;
-    set beresp.uncacheable = true;
-    return(deliver);
+    return(pass);
   }
 }
 
