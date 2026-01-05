@@ -21,6 +21,13 @@ concurrency:
   group: terraform-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+# Permissions needed for the workflow
+permissions:
+  contents: read        # Read repository contents
+  pull-requests: write  # Post PR comments
+  issues: write         # Create approval issues
+  actions: read         # Read workflow artifacts
+
 jobs:
   terraform-validate:
     name: Validate
