@@ -50,7 +50,7 @@ resource "fastly_service_vcl" "mealfinding" {
   # Condition: Request is for API subdomain
   condition {
     name      = "is_api_request"
-    type      = "REQUEST"
+    type      = "CACHE"
     statement = "req.http.host == \"api.${var.domain_name}\""
     priority  = 10
   }
@@ -58,7 +58,7 @@ resource "fastly_service_vcl" "mealfinding" {
   # Condition: Request is for static assets
   condition {
     name      = "is_static_asset"
-    type      = "REQUEST"
+    type      = "CACHE"
     statement = "req.url.ext ~ \"^(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|webp|avif)$\""
     priority  = 20
   }
@@ -66,7 +66,7 @@ resource "fastly_service_vcl" "mealfinding" {
   # Condition: Request is for HTML
   condition {
     name      = "is_html_request"
-    type      = "REQUEST"
+    type      = "CACHE"
     statement = "req.url.ext == \"html\" || req.url.path ~ \"^/[^.]*$\""
     priority  = 30
   }
