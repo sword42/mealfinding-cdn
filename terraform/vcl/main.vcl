@@ -68,15 +68,6 @@ sub vcl_recv {
   }
 }
 
-sub vcl_hash {
-  # Include host in cache key to separate www vs api content
-  if (req.http.host) {
-    hash_data(req.http.host);
-  }
-
-  #FASTLY hash
-}
-
 sub vcl_fetch {
   #FASTLY fetch
 
